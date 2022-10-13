@@ -8,7 +8,7 @@
   },
   "scripts": {
     "eslint": "eslint .",
-    "test": "npm run mocha",
+    "test": "npm run cover",
     "checkall": "npm run eslint",
     "mocha": "node node_modules/mocha/bin/_mocha -b",
     "cover": "nyc mocha"
