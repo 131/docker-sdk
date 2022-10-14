@@ -111,7 +111,7 @@ class DockerSDK {
 
     } finally {
 
-      if(!(get(service_payload, 'TaskTemplate.LogDriver.Name') in ['gelf', 'syslog'])) {
+      if(!(['gelf', 'syslog'].includes(get(service_payload, 'TaskTemplate.LogDriver.Name')))) {
         log.info("Now fetching logs for %s", service_payload.Name);
 
         const logs_stdout = await this.service_logs(service.ID, true, false);
