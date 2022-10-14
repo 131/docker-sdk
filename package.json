@@ -1,6 +1,6 @@
 {
   "name": "@131/docker-sdk",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "",
   "main": "docker-sdk.js",
   "directories": {
