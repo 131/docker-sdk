@@ -12,7 +12,7 @@ class RegistryAuth {
 
   get_image_auth(image) {
     let {registry} = canonizeImagePath(image);
-    return this.crendentials[registry];
+    return this.credentials[registry];
   }
 
   get_image_manifest(image) {
