@@ -2,7 +2,7 @@
   "name": "@131/docker-sdk",
   "version": "0.9.4",
   "description": "",
-  "main": "docker-sdk.js",
+  "main": "stack.js",
   "directories": {
     "test": "test"
   },

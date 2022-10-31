@@ -47,6 +47,15 @@ describe("Registry test suite", function() {
 
   });
 
+  /*
+  it("should fetch public remote manifests", async() {
+
+    rclone/rclone@sha256:f186eb535186c0da798385e1710e09c9bcfadc2a1efa176959d9462d96d9b8b8
+
+    postgres:9.6
+  });
+*/
+
 });
 
 

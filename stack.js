@@ -4,10 +4,16 @@ const debug     = require('debug');
 const url       = require('url');
 
 const get       = require('mout/object/get');
+const set       = require('mout/object/set');
+const trim      = require('mout/string/trim');
 
-const sleep       = require('nyks/async/sleep');
-const request     = require('nyks/http/request');
-const drain       = require('nyks/stream/drain');
+
+const sleep     = require('nyks/async/sleep');
+const request   = require('nyks/http/request');
+const drain     = require('nyks/stream/drain');
+const md5       = require('nyks/crypto/md5');
+const splitArgs = require('nyks/process/splitArgs');
+
 
 const log = {
   info  : debug("docker-sdk:info"),
@@ -16,9 +22,9 @@ const log = {
 };
 
 
-class DockerSDK {
+class StackSDK {
 
-  constructor(dockerSock = (process.env["DOCKER_HOST"] || {"socketPath" : "/var/run/docker.sock", "host" : "localhost"})) {
+  constructor(stack_name = (process.env['STACK_NAME'] || ''), dockerSock = (process.env["DOCKER_HOST"] || {"socketPath" : "/var/run/docker.sock", "host" : "localhost"})) {
     if(typeof dockerSock == "string")
       dockerSock = url.parse(dockerSock);
 
@@ -30,10 +36,177 @@ class DockerSDK {
         'Content-Type' : 'application/json',
       }
     };
+
+    this.STACK_NAME = stack_name;
   }
 
 
+  async compose_service(task_name, specs, deploy_ns = this.STACK_NAME) {
+
+    let {
+      command,
+      image,
+      cwd,
+      entrypoint,
+      volumes : volumes_specs,
+      dns,
+      cap_add,
+      networks : networks_specs,
+      logging : logging_specs,
+      environment : env_specs,
+      secrets : secrets_specs,
+      deploy : deploy_specs,
+    } = specs;
+
+    if(!image)
+      throw `Missing image for task ${task_name}`;
+
+
+    let name = trim(task_name.replace(/[^a-z0-9_-]/gi, '_').replace(/_+/g, '_'), '_');
+    name = `${name.substring(0, 63 - 6 - 6)}_${md5(task_name).substring(0, 5)}`;
+
+
+    // @todo: implement the rest of the "deploy" spec
+    let placement_constraints = get(deploy_specs, "placement.constraints");
+    if(!Array.isArray(placement_constraints))
+      placement_constraints = null;
+
+
+    let environment = [];
+    for(const [key, value] of Object.entries(env_specs || {}))
+      environment.push(`${key}=${value}`);
+
+    command    = typeof command == "string"    ? splitArgs(command).map(String)    : command;
+    entrypoint = typeof entrypoint == "string" ? splitArgs(entrypoint).map(String) : entrypoint;
+
+    let networks = [];
+    if(networks_specs) {
+      for(const network of networks_specs)
+        networks.push({ "Target" : `${this.STACK_NAME}_${network}` });
+    }
+
+
+    let secrets = [];
+    if(secrets_specs) {
+      let secrets_map = await this.secrets_list();
+      for(let secret of secrets_specs) {
+        if(typeof secret == "string")
+          secret = { source : secret};
+
+        let {source : SecretName, mode : Mode, uid : UID, gid : GID, target : Name} = {target : secret.source, uid : "0", gid : "0", mode : 0o444, ...secret};
+        let {ID : SecretID}  = secrets_map.find(secret => secret.Spec.Name == SecretName) || {};
+
+        if(!SecretID)
+          throw `Cannot lookup secret ${SecretName}`;
+
+        secrets.push({SecretID, SecretName, File : {Name, UID, GID, Mode}});
+      }
+    }
+
+    let mounts = [];
+    if(volumes_specs) {
+      for(const volume of volumes_specs) {
+        let mnt = {};
+
+        if(typeof volume === 'string') {
+          const [source, target] = volume.split(':');
+          mnt = {
+            'Type'  : 'bind',
+            'Source' : `${this.STACK_NAME}_${source}`,
+            'Target' : target,
+          };
+        }
+
+        else {
+          mnt = {
+            'Type'  : volume.type,
+            'Source' : `${this.STACK_NAME}_${volume.source}`,
+            'Target' : volume.target,
+          };
+
+          if('read_only' in volume)
+            mnt.ReadOnly = !!volume.read_only;
+
+          if('volume' in volume && 'nocopy' in volume.volume)
+            mnt.VolumeOptions = {'NoCopy' : !!volume.volume.nocopy};
+        }
+
+        mounts.push(mnt);
+      }
+    }
+
+
+    const labels = {
+      "com.docker.stack.namespace" : deploy_ns,
+    };
+
+    let logging = {};
+    if(logging_specs) {
+      logging.Name = logging_specs.driver;
+      if(logging_specs.options)
+        logging.Options = {"tag" : name, ...logging_specs.options};
+    }
+
+
+    const service_payload =  {
+      "Name" : name,
+      "Labels" : labels,
+
+      "TaskTemplate" : {
+        "ContainerSpec" : {
+          "Image" : image,
+          "Labels" : labels,
+          "Env" : environment,
+          "Mounts" : mounts,
+          "Secrets" : secrets,
+          // "Configs": [],
+        },
+
+        "NetworkAttachmentSpec" : {},
+        "Resources" :  {},
+        "RestartPolicy" : { "Condition" : "none"},
+        "Placement" : {"Constraints" : placement_constraints},
+        "ForceUpdate" : 0,
+        "ReadOnly" : true,
+        "LogDriver" : logging,
+      },
+
+      "Mode" : {
+        //"replicated-job is still unstable feature: see moby/moby/issues/42789, moby/moby/issues/42742, moby/moby/issues/42741
+        "Replicated" : {"Replicas" : 1},
+      },
+
+      "Networks" : networks,
+    };
+
+    if(entrypoint)
+      set(service_payload, "TaskTemplate.ContainerSpec.Command", entrypoint);
+
+    if(command)
+      set(service_payload, "TaskTemplate.ContainerSpec.Args", command);
+
+    if(cwd)
+      set(service_payload, "TaskTemplate.ContainerSpec.Dir", cwd);
+
+    if(cap_add) {
+      if(typeof cap_add == "string")
+        cap_add = [cap_add];
+      set(service_payload, "TaskTemplate.ContainerSpec.CapabilityAdd", cap_add);
+    }
+
+    if(dns) {
+      if(typeof dns == "string")
+        dns = [dns];
+      set(service_payload, "TaskTemplate.ContainerSpec.DNSConfig.Nameservers", dns);
+    }
+
+    //console.log(JSON.stringify(service_payload, null, 2));
+    return service_payload;
+
+  }
+
   async service_exec(service_payload, credentials = null) {
+
 
     if(!get(service_payload, "Name"))
       throw `Unable to create empty service name`;
@@ -290,4 +463,4 @@ class DockerSDK {
 
 }
 
-module.exports = DockerSDK;
+module.exports = StackSDK;
