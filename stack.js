@@ -236,7 +236,9 @@ class StackSDK {
       throw msg;
     }
 
-    log.debug("Created service %s #%s", service_payload.Name, service.ID,
+    let traceID = `${service_payload.Name}#${service.ID}`;
+
+    log.debug("Created service %s", traceID,
       get(service_payload, "TaskTemplate.ContainerSpec.Image"),
       get(service_payload, "TaskTemplate.ContainerSpec.Command"),
       get(service_payload, "TaskTemplate.ContainerSpec.Args"),
@@ -244,7 +246,7 @@ class StackSDK {
     );
 
 
-    log.info("Waiting for service %s tasks to stabilize", service_payload.Name);
+    log.info("Waiting for service '%s' tasks to stabilize", traceID);
 
     try {
       do {
@@ -257,15 +259,15 @@ class StackSDK {
 
         const task = tasks_list.shift();
         if(tasks_list.length)
-          throw `Pulse service '${service_payload.Name}' tasks must be unary (too many tasks remaining in service #${service.ID})`;
+          throw `Pulse service '${traceID}' tasks must be unary (too many tasks remaining in service #${traceID})`;
 
-        log.info(`Task in service ${service_payload.Name} is ${task.Status.State} (${task.Status.Message})`);
+        log.info(`Task in service ${traceID} is ${task.Status.State} (${task.Status.Message})`);
 
         if(['complete'].includes(task.Status.State))
           break;
 
         if(['failed', 'rejected'].includes(task.Status.State))
-          throw `Task failed in service ${service_payload.Name}: ${task.Status.Err}`;
+          throw `Task failed in service ${traceID}: ${task.Status.Err}`;
 
         await sleep(2 * 1000);
       } while(true);
@@ -285,7 +287,7 @@ class StackSDK {
     } finally {
 
       if(!(['gelf', 'syslog'].includes(get(service_payload, 'TaskTemplate.LogDriver.Name')))) {
-        log.info("Now fetching logs for %s", service_payload.Name);
+        log.info("Now fetching logs for %s", traceID);
 
         const logs_stdout = await this.service_logs(service.ID, true, false);
         if(logs_stdout)
@@ -296,7 +298,7 @@ class StackSDK {
           log.error(logs_stderr);
       }
 
-      log.info("Pruning service %s", service_payload.Name);
+      log.info("Pruning service %s", traceID);
       await this.service_delete(service.ID);
 
     }
