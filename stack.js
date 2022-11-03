@@ -14,6 +14,7 @@ const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
+const Container = require('./lib/container');
 
 const log = {
   info  : debug("docker-sdk:info"),
@@ -44,8 +45,9 @@ class StackSDK {
   }
 
   async container_run(specs) {
-    let payload = await this.compose_run(specs);
-    let container = new Container(payload);
+    const payload = await this.compose_run(specs);
+    const container = new Container(this, payload);
+
     return container;
   }
 
@@ -62,7 +64,7 @@ class StackSDK {
     } = specs;
 
     if(!image)
-      throw `Missing image for task ${task_name}`;
+      throw `Missing image for docker run`;
 
 
 
@@ -119,9 +121,9 @@ class StackSDK {
 
     const container_payload =  {
 
-      "AttachStdin": false,
-      "AttachStdout": true,
-      "AttachStderr": true,
+      "AttachStdin" : false,
+      "AttachStdout" : true,
+      "AttachStderr" : true,
 
       "Env" : environment,
       //"Name" : name,
@@ -132,9 +134,9 @@ class StackSDK {
 
       "Image" : image,
 
-      "HostConfig": {
+      "HostConfig" : {
         "Mounts" : mounts,
-        "AutoRemove": true,
+        "AutoRemove" : true,
         "ReadonlyRootfs" : true,
       },
 
@@ -148,13 +150,18 @@ class StackSDK {
   }
 
   async request(method, query, body = undefined) {
+    query = typeof query == "string" ? {path : query} : query;
     const payload = {
       ...this.default_transport_options,
+      ...query,
+      headers : {...this.default_transport_options.headers, ...query.headers},
       method,
-      ...(typeof query == "string" ? {path : query} : query),
     };
 
-    const res  = await request(payload);
+    if(body)
+      body = JSON.stringify(body);
+
+    const res = await request(payload, body);
     return res;
   }
 
@@ -170,7 +177,7 @@ class StackSDK {
       throw `Invalid response for /version`;
 
     return JSON.parse(await drain(res));
- }
+  }
 
   async compose_service(task_name, specs, deploy_ns = this.STACK_NAME) {
 
