@@ -15,6 +15,7 @@ const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
 const Container = require('./lib/container');
+const Images    = require('./lib/images');
 
 const log = {
   info  : debug("docker-sdk:info"),
@@ -42,10 +43,13 @@ class StackSDK {
     };
 
     this.STACK_NAME = stack_name;
+    this.images     = new Images(this);
   }
 
   async container_run(specs) {
     const payload = await this.compose_run(specs);
+    await this.images.check_pull(payload.Image);
+
     const container = new Container(this, payload);
 
     return container;

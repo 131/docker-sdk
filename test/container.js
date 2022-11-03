@@ -25,7 +25,7 @@ describe("Stack SDK test suite", function() {
   it("Should do a simple failed docker run", async function() {
 
     let specs = {
-      "image" : "debian:bullseye@sha256:2ce44bbc00a79113c296d9d25524e15d423b23303fdbbe20190d2f96e0aeb251",
+      "image" : "rclone/rclone@sha256:f186eb535186c0da798385e1710e09c9bcfadc2a1efa176959d9462d96d9b8b8",
       "entrypoint" : "/bin/sh",
       "command" : ["-c", "echo -n $((7+1)); exit 1"],
     };
