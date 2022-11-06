@@ -1,5 +1,7 @@
 #!/bin/bash
 
+docker node ls -q || docker swarm init
+
 cat <<EOS | docker stack deploy -c - validation
 version: "3.8"
 
