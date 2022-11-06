@@ -1,0 +1,22 @@
+#!/bin/bash
+
+cat <<EOS | docker stack deploy -c - validation
+version: "3.8"
+
+networks:
+  cluster-test:
+    driver: overlay
+    attachable: true
+
+services:
+  http-ping:
+    image: ghcr.io/131/http-ping:v1.0.0
+
+
+    networks:
+      - cluster-test
+EOS
+
+
+
+

@@ -82,8 +82,13 @@ class StackSDK {
 
     let networks = {};
     if(networks_specs) {
-      for(const network of networks_specs)
-        networks[`${this.STACK_NAME}_${network}`] = {};
+      for(const network of networks_specs) {
+        networks[`${this.STACK_NAME}_${network}`] = {
+          IPAMConfig : null,
+          Links : null,
+          Aliases : [],
+        };
+      }
     }
 
 
@@ -145,9 +150,10 @@ class StackSDK {
       },
 
       "WorkingDir" : cwd,
-      "Networks" : networks,
+      "NetworkingConfig" : {
+        "EndpointsConfig" : networks
+      },
     };
-
 
     //console.log(JSON.stringify(container_payload, null, 2));
     return container_payload;

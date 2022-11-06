@@ -3,7 +3,7 @@
 const expect = require('expect.js');
 const StackSDK = require('../stack');
 const drain = require('nyks/stream/drain');
-
+const passthru = require('nyks/child_process/passthru');
 
 
 describe("Stack SDK test suite", function() {
@@ -11,16 +11,22 @@ describe("Stack SDK test suite", function() {
   let stack;
   this.timeout(30 * 1000);
 
+
+  before("It should ignite a docker stack fixture", async () => {
+    await passthru("./test/deploy_swarm");
+  });
+
   before("It should ignite docker stack sdk instance", function() {
     stack = new StackSDK("validation");
   });
-
 
   it("Should test communication with underlying docker server", async  function () {
     let version = await stack.version();
     expect(version.Version).to.be.ok();
     expect(version.ApiVersion).to.be.ok();
   });
+
+
 
   it("Should do a simple failed docker run", async function() {
 
@@ -57,8 +63,28 @@ describe("Stack SDK test suite", function() {
 
     expect(end).to.be(0);
     // console.log(end);
-
   });
+
+
+  it("Should do a simple curl docker run with a private network", async function() {
+
+    let specs = {
+      "image" : "curlimages/curl:7.85.0",
+      "command" : "-sS http://http-ping/ping",
+      "networks" : ["cluster-test"],
+    };
+
+    const container = await stack.container_run(specs);
+
+    container.stderr.pipe(process.stderr);
+    let end = await container.run();
+
+    expect(String(await drain(container.stdout))).to.eql("pong");
+
+    expect(end).to.be(0);
+    // console.log(end);
+  });
+
 });
 
 
