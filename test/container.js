@@ -26,7 +26,32 @@ describe("Stack SDK test suite", function() {
     expect(version.ApiVersion).to.be.ok();
   });
 
+  it("Should do a volume mount", async function() {
 
+    let specs = {
+      "image" : "debian:bullseye@sha256:2ce44bbc00a79113c296d9d25524e15d423b23303fdbbe20190d2f96e0aeb251",
+      "entrypoint" : ["cat", "/var/webfiles/ping"],
+
+      "volumes" : [{
+        "type" : "volume",
+        "source" : "webfiles",
+        "target" : "/var/webfiles",
+        "volume" : {
+          "nocopy" : true
+        }
+      }]
+    };
+
+    const container = await stack.container_run(specs);
+
+    //container.stdout.pipe(process.stderr);
+    let end = await container.run();
+
+    expect(String(await drain(container.stdout))).to.eql("pong");
+
+    expect(end).to.be(0);
+    // console.log(end);
+  });
 
   it("Should do a simple failed docker run", async function() {
 
@@ -64,6 +89,9 @@ describe("Stack SDK test suite", function() {
     expect(end).to.be(0);
     // console.log(end);
   });
+
+
+
 
 
   it("Should do a simple curl docker run with a private network", async function() {

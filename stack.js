@@ -123,6 +123,35 @@ class StackSDK {
         mounts.push(mnt);
       }
     }
+    /*
+    let binds = [];
+    if(volumes_specs) {
+      for(const volume of volumes_specs) {
+        let bind = "";
+
+        if(typeof volume === 'string') {
+          const [source, target] = volume.split(':');
+          bind = `${this.STACK_NAME}_${source}:${target}`;
+        }
+
+        else {
+          let opts = [];
+          bind = `${this.STACK_NAME}_${volume.source}:${volume.target}`;
+
+          if('read_only' in volume)
+            opts.push("ro");
+
+          if('volume' in volume && 'nocopy' in volume.volume)
+            opts.push("nocopy");
+          if(opts.length)
+            bind += ":" + opts.join(',');
+        }
+
+        binds.push(bind);
+      }
+    }
+*/
+
 
     const labels = {
       "com.docker.stack.namespace" : this.STACK_NAME,
