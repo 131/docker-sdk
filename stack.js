@@ -14,12 +14,17 @@ const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
+const Container = require('./lib/container');
+const Images    = require('./lib/images');
 
 const log = {
   info  : debug("docker-sdk:info"),
   error : debug("docker-sdk:error"),
   debug : debug("docker-sdk:debug"),
 };
+
+
+
 
 
 class StackSDK {
@@ -38,8 +43,180 @@ class StackSDK {
     };
 
     this.STACK_NAME = stack_name;
+    this.images     = new Images(this);
   }
 
+  async container_run(specs) {
+    const payload = await this.compose_run(specs);
+    await this.images.check_pull(payload.Image);
+
+    const container = new Container(this, payload);
+
+    return container;
+  }
+
+  async compose_run(specs) {
+
+    let {
+      command,
+      image,
+      cwd,
+      entrypoint,
+      volumes : volumes_specs,
+      networks : networks_specs,
+      environment : env_specs,
+    } = specs;
+
+    if(!image)
+      throw `Missing image for docker run`;
+
+
+
+
+    let environment = [];
+    for(const [key, value] of Object.entries(env_specs || {}))
+      environment.push(`${key}=${value}`);
+
+    command    = typeof command == "string"    ? splitArgs(command).map(String)    : command;
+    entrypoint = typeof entrypoint == "string" ? splitArgs(entrypoint).map(String) : entrypoint;
+
+    let networks = {};
+    if(networks_specs) {
+      for(const network of networks_specs) {
+        networks[`${this.STACK_NAME}_${network}`] = {
+          IPAMConfig : null,
+          Links : null,
+          Aliases : [],
+        };
+      }
+    }
+
+
+    let mounts = [];
+    if(volumes_specs) {
+      for(const volume of volumes_specs) {
+        let mnt = {};
+
+        if(typeof volume === 'string') {
+          const [source, target] = volume.split(':');
+          mnt = {
+            'Type'  : 'bind',
+            'Source' : `${this.STACK_NAME}_${source}`,
+            'Target' : target,
+          };
+        }
+
+        else {
+          mnt = {
+            'Type'  : volume.type,
+            'Source' : `${this.STACK_NAME}_${volume.source}`,
+            'Target' : volume.target,
+          };
+
+          if('read_only' in volume)
+            mnt.ReadOnly = !!volume.read_only;
+
+          if('volume' in volume && 'nocopy' in volume.volume)
+            mnt.VolumeOptions = {'NoCopy' : !!volume.volume.nocopy};
+        }
+
+        mounts.push(mnt);
+      }
+    }
+    /*
+    let binds = [];
+    if(volumes_specs) {
+      for(const volume of volumes_specs) {
+        let bind = "";
+
+        if(typeof volume === 'string') {
+          const [source, target] = volume.split(':');
+          bind = `${this.STACK_NAME}_${source}:${target}`;
+        }
+
+        else {
+          let opts = [];
+          bind = `${this.STACK_NAME}_${volume.source}:${volume.target}`;
+
+          if('read_only' in volume)
+            opts.push("ro");
+
+          if('volume' in volume && 'nocopy' in volume.volume)
+            opts.push("nocopy");
+          if(opts.length)
+            bind += ":" + opts.join(',');
+        }
+
+        binds.push(bind);
+      }
+    }
+*/
+
+
+    const labels = {
+      "com.docker.stack.namespace" : this.STACK_NAME,
+    };
+
+    const container_payload =  {
+
+      "AttachStdin" : false,
+      "AttachStdout" : true,
+      "AttachStderr" : true,
+
+      "Env" : environment,
+      //"Name" : name,
+      "Labels" : labels,
+
+      "Entrypoint" : entrypoint,
+      "Cmd" :  command,
+
+      "Image" : image,
+
+      "HostConfig" : {
+        "Mounts" : mounts,
+        "AutoRemove" : true,
+        "ReadonlyRootfs" : true,
+      },
+
+      "WorkingDir" : cwd,
+      "NetworkingConfig" : {
+        "EndpointsConfig" : networks
+      },
+    };
+
+    //console.log(JSON.stringify(container_payload, null, 2));
+    return container_payload;
+  }
+
+  async request(method, query, body = undefined) {
+    query = typeof query == "string" ? {path : query} : query;
+    const payload = {
+      ...this.default_transport_options,
+      ...query,
+      headers : {...this.default_transport_options.headers, ...query.headers},
+      method,
+    };
+
+    if(body)
+      body = JSON.stringify(body);
+
+    const res = await request(payload, body);
+    return res;
+  }
+
+  async ping() {
+    let res = await this.request("GET", "/_ping");
+    return String(await drain(res));
+  }
+
+
+  async version() {
+    const res = await this.request("GET", "/version");
+    if(res.statusCode != 200)
+      throw `Invalid response for /version`;
+
+    return JSON.parse(await drain(res));
+  }
 
   async compose_service(task_name, specs, deploy_ns = this.STACK_NAME) {
 

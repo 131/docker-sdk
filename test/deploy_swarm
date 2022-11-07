@@ -1,0 +1,50 @@
+#!/bin/bash
+set -ex
+
+docker node ls -q || docker swarm init
+
+volume=$(pwd)/test/volume
+
+if [[ -x /bin/wslpath ]] ; then
+  volume=$(wslpath -w $volume)
+  echo "Please ignite using"
+  echo "docker volume create  --driver local -o o=bind  -o type=none -o device=$volume validation_webfiles"
+fi
+
+cat <<EOS | docker stack deploy -c - validation
+version: "3.8"
+
+volumes:
+  webfiles:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: $volume
+
+networks:
+  cluster-test:
+    driver: overlay
+    attachable: true
+
+services:
+  http-ping:
+    image: ghcr.io/131/http-ping:v1.0.0
+
+    volumes:
+      - type: volume
+        read_only: true
+        source: webfiles
+        target: /var/webfiles
+        volume:
+          nocopy: true
+
+    networks:
+      - cluster-test
+EOS
+
+
+echo "Waiting for the stack to be ready"
+docker service update -q validation_http-ping
+docker run --rm -v validation_webfiles:/var/webfiles --entrypoint /bin/sh debian:bullseye -c  "cat /var/webfiles/ping"
+
