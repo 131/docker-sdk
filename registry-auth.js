@@ -2,6 +2,7 @@
 
 const RegistrySDK = require('./registry-sdk');
 const {canonizeImagePath} = RegistrySDK;
+const trim   = require('mout/string/trim');
 
 class RegistryAuth {
 
@@ -12,7 +13,24 @@ class RegistryAuth {
 
   get_image_auth(image) {
     let {registry} = canonizeImagePath(image);
-    return this.credentials[registry];
+
+    return this.get_registry_auth(registry);
+  }
+
+  get_registry_auth(registry) {
+    let credentials = this.credentials[registry];
+
+    if(!credentials) {
+      let env = trim(registry.toUpperCase().replace(/[^a-z]+/gi,  '_'), '_');
+      let user = `${env}_USER`, password = `${env}_PASSWORD`;
+
+      if(!(user in process.env))
+        return;
+
+      credentials =  {username  : process.env[user], password : process.env[password]};
+    }
+
+    return {serveraddress : registry, ...credentials};
   }
 
   get_image_manifest(image) {
@@ -26,7 +44,9 @@ class RegistryAuth {
     if(this.registries[registry])
       return this.registries[registry];
 
-    this.registries[registry] = new RegistrySDK(registry, this.credentials[registry]);
+    let credentials = this.get_registry_auth(registry);
+    this.registries[registry] = new RegistrySDK(registry, credentials);
+
     return this.registries[registry];
   }
 

@@ -46,12 +46,11 @@ class StackSDK {
     this.images     = new Images(this);
   }
 
-  async container_run(specs) {
+  async container_run(specs, registry_auth) {
     const payload = await this.compose_run(specs);
-    await this.images.check_pull(payload.Image);
+    await this.images.check_pull(payload.Image, registry_auth);
 
     const container = new Container(this, payload);
-
     return container;
   }
 
