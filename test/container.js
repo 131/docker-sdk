@@ -71,12 +71,14 @@ describe("Stack SDK test suite", function() {
 
   });
 
+
   it("Should do a simple successful docker run", async function() {
 
     let specs = {
       "image" : "debian:bullseye@sha256:2ce44bbc00a79113c296d9d25524e15d423b23303fdbbe20190d2f96e0aeb251",
       "entrypoint" : "/bin/sh",
-      "command" : ["-c", "echo -n $((3+1)); echo -n hi 1>&2; exit 0"],
+      "environment" : {"FOO" : "BAR"},
+      "command" : ["-c", "echo -n $((3+1)); echo -n $FOO 1>&2; exit 0"],
     };
 
     const container = await stack.container_run(specs);
@@ -84,7 +86,7 @@ describe("Stack SDK test suite", function() {
     let end = await container.run();
 
     expect(String(await drain(container.stdout))).to.eql("4");
-    expect(String(await drain(container.stderr))).to.eql("hi");
+    expect(String(await drain(container.stderr))).to.eql("BAR");
 
     expect(end).to.be(0);
     // console.log(end);
