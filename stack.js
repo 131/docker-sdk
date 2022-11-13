@@ -59,7 +59,7 @@ class StackSDK {
     let {
       command,
       image,
-      cwd,
+      working_dir,
       entrypoint,
       volumes : volumes_specs,
       networks : networks_specs,
@@ -177,7 +177,7 @@ class StackSDK {
         "ReadonlyRootfs" : true,
       },
 
-      "WorkingDir" : cwd,
+      "WorkingDir" : working_dir,
       "NetworkingConfig" : {
         "EndpointsConfig" : networks
       },
@@ -222,7 +222,7 @@ class StackSDK {
     let {
       command,
       image,
-      cwd,
+      working_dir,
       entrypoint,
       volumes : volumes_specs,
       dns,
@@ -361,8 +361,8 @@ class StackSDK {
     if(command)
       set(service_payload, "TaskTemplate.ContainerSpec.Args", command);
 
-    if(cwd)
-      set(service_payload, "TaskTemplate.ContainerSpec.Dir", cwd);
+    if(working_dir)
+      set(service_payload, "TaskTemplate.ContainerSpec.Dir", working_dir);
 
     if(cap_add) {
       if(typeof cap_add == "string")
