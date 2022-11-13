@@ -174,7 +174,7 @@ class StackSDK {
       "HostConfig" : {
         "Mounts" : mounts,
         "AutoRemove" : true,
-        "ReadonlyRootfs" : true,
+        "ReadonlyRootfs" : false,
       },
 
       "WorkingDir" : working_dir,
