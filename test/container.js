@@ -3,6 +3,7 @@
 const expect = require('expect.js');
 const StackSDK = require('../stack');
 const drain = require('nyks/stream/drain');
+const md5 = require('nyks/crypto/md5');
 const passthru = require('nyks/child_process/passthru');
 
 
@@ -52,6 +53,35 @@ describe("Stack SDK test suite", function() {
     expect(end).to.be(0);
     // console.log(end);
   });
+
+
+  it("Should do a check stdout behavior", async function() {
+
+    let specs = {
+      "image" : "debian:bullseye@sha256:2ce44bbc00a79113c296d9d25524e15d423b23303fdbbe20190d2f96e0aeb251",
+      "entrypoint" : ["cat", "/var/webfiles/01395f92b7e79886b4489d3835b69153.jpg"],
+
+      "volumes" : [{
+        "type" : "volume",
+        "source" : "webfiles",
+        "target" : "/var/webfiles",
+        "volume" : {
+          "nocopy" : true
+        }
+      }]
+    };
+
+    const container = await stack.container_run(specs);
+
+    //container.stdout.pipe(process.stderr);
+    let [end, body]= await Promise.all([container.run(), drain(container.stdout)]);
+
+    expect(md5(body)).to.eql("01395f92b7e79886b4489d3835b69153");
+
+    expect(end).to.be(0);
+    // console.log(end);
+  });
+
 
   it("Should do a simple failed docker run", async function() {
 
