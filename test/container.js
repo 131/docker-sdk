@@ -74,7 +74,7 @@ describe("Stack SDK test suite", function() {
     const container = await stack.container_run(specs);
 
     //container.stdout.pipe(process.stderr);
-    let [end, body]= await Promise.all([container.run(), drain(container.stdout)]);
+    let [end, body] = await Promise.all([container.run(), drain(container.stdout)]);
 
     expect(md5(body)).to.eql("01395f92b7e79886b4489d3835b69153");
 

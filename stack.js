@@ -1,7 +1,6 @@
 "use strict";
 
 const debug     = require('debug');
-const url       = require('url');
 
 const get       = require('mout/object/get');
 const set       = require('mout/object/set');
@@ -9,13 +8,13 @@ const trim      = require('mout/string/trim');
 
 
 const sleep     = require('nyks/async/sleep');
-const request   = require('nyks/http/request');
 const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
 const Container = require('./lib/container');
 const Images    = require('./lib/images');
+const Modem     = require('./lib/modem');
 
 const log = {
   info  : debug("docker-sdk:info"),
@@ -25,23 +24,12 @@ const log = {
 
 
 
-
-
 class StackSDK {
 
   constructor(stack_name = (process.env['STACK_NAME'] || ''), dockerSock = (process.env["DOCKER_HOST"] || {"socketPath" : "/var/run/docker.sock", "host" : "localhost"})) {
-    if(typeof dockerSock == "string")
-      dockerSock = url.parse(dockerSock);
 
-    this.default_transport_options = {
-      ...dockerSock,
-      protocol : 'http:',
-      reqTimeout : 5 * 1000,
-      headers : {
-        'Content-Type' : 'application/json',
-      }
-    };
-
+    let modem =  new Modem(dockerSock);
+    this.request = modem.request;
     this.STACK_NAME = stack_name;
     this.images     = new Images(this);
   }
@@ -187,21 +175,7 @@ class StackSDK {
     return container_payload;
   }
 
-  async request(method, query, body = undefined) {
-    query = typeof query == "string" ? {path : query} : query;
-    const payload = {
-      ...this.default_transport_options,
-      ...query,
-      headers : {...this.default_transport_options.headers, ...query.headers},
-      method,
-    };
 
-    if(body)
-      body = JSON.stringify(body);
-
-    const res = await request(payload, body);
-    return res;
-  }
 
   async ping() {
     let res = await this.request("GET", "/_ping");
@@ -492,19 +466,16 @@ class StackSDK {
     log.debug(`Creating service ${service.Name} from image ${image}...`);
 
     const query = {
-      ...this.default_transport_options,
       path : '/services/create',
-      json : true,
     };
 
     if(credentials) {
       query.headers = {
-        ...query.headers,
         'X-Registry-Auth' : Buffer.from(JSON.stringify(credentials)).toString('base64'),
       };
     }
 
-    const res  = await request(query, JSON.stringify(service));
+    const res  = await this.request("POST", query, service);
     const body = await drain(res);
     if(res.statusCode !== 201)
       throw `Unable to create service ${service.Name}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -519,15 +490,8 @@ class StackSDK {
       service : {[service_id] : true},
     };
 
-    const query = {
-      ...this.default_transport_options,
-      path : '/tasks',
-      qs : {filters : JSON.stringify(filters)},
-    };
-
     log.debug(`Checking task status for service ${service_id}...`);
-
-    const res  = await request(query);
+    const res  = await this.request("GET", {path : '/tasks', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
 
     if(res.statusCode !== 200)
@@ -540,14 +504,9 @@ class StackSDK {
 
   async secrets_list() {
 
-    const query = {
-      ...this.default_transport_options,
-      path : '/secrets',
-    };
-
     log.debug(`Checking secrets...`);
 
-    const res  = await request(query);
+    const res  = await this.request("GET", '/secrets');
 
     if(res.statusCode !== 200)
       throw `Unable to get secrets`;
@@ -558,14 +517,9 @@ class StackSDK {
 
   async configs_list() {
 
-    const query = {
-      ...this.default_transport_options,
-      path : '/configs',
-    };
-
     log.debug(`Checking configs...`);
 
-    const res  = await request(query);
+    const res  = await this.request('GET', '/configs');
     if(res.statusCode !== 200)
       throw `Unable to get configs list`;
 
@@ -583,15 +537,9 @@ class StackSDK {
     if(name)
       filters.name = [name];
 
-    const query = {
-      ...this.default_transport_options,
-      path : '/services',
-      qs : {filters : JSON.stringify(filters)},
-    };
-
     log.debug(`Getting services list in ${JSON.stringify(filters)}...`);
 
-    const res  = await request(query);
+    const res  = await this.request("GET", {path : '/services', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get services for ${namespace}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -607,15 +555,9 @@ class StackSDK {
       // details: true,
     };
 
-    const query = {
-      ...this.default_transport_options,
-      path : `/services/${service_id}/logs`,
-      qs : params,
-    };
-
     log.debug(`Fetching ${stdout && stderr ? 'all' : stdout ? 'stdout' : 'stderr'} logs for service ${service_id}...`);
 
-    const res  = await request(query);
+    const res  = await this.request("GET", {path : `/services/${service_id}/logs`, qs : params});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get logs for service ${service_id}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -625,15 +567,9 @@ class StackSDK {
 
 
   async service_delete(service_id) {
-    const query = {
-      ...this.default_transport_options,
-      path   : `/services/${service_id}`,
-      method : 'DELETE',
-    };
-
     log.debug(`Removing service ${service_id}...`);
+    const res = await this.request('DELETE', `/services/${service_id}`);
 
-    const res = await request(query);
     if(![200, 404].includes(res.statusCode))
       throw `Cannot delete service ${service_id}`;
   }
