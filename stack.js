@@ -515,11 +515,22 @@ class StackSDK {
     return JSON.parse(body);
   }
 
-  async configs_list() {
+  async configs_list({id, name, namespace} = {}) {
+    const filters = {};
+
+    if(namespace)
+      filters.label = [`com.docker.stack.namespace=${namespace}`];
+
+    if(id)
+      filters.id = [id];
+
+    if(name)
+      filters.name = [name];
+
 
     log.debug(`Checking configs...`);
 
-    const res  = await this.request('GET', '/configs');
+    const res  = await this.request('GET', {path : '/configs', qs : {filters : JSON.stringify(filters)}});
     if(res.statusCode !== 200)
       throw `Unable to get configs list`;
 
