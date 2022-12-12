@@ -1,7 +1,6 @@
 #!/bin/bash
 set -ex
 
-docker node ls -q || docker swarm init
 
 volume=$(pwd)/test/volume
 

@@ -8,6 +8,7 @@ jobs:
     - uses: actions/setup-node@v2
       with:
         node-version: '12.x'
+    - run: docker node ls -q || docker swarm init
     - run: npm install
     - run: npm test
     - name: Coveralls

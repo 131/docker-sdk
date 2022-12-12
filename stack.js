@@ -23,6 +23,10 @@ const log = {
 };
 
 
+const escape = (input) => {
+  let name = trim(input.replace(/[^a-z0-9_-]/gi, '_').replace(/_+/g, '_'), '_');
+  return `${name.substring(0, 63 - 6 - 6)}_${md5(input).substring(0, 5)}`;
+};
 
 class StackSDK {
 
@@ -212,9 +216,7 @@ class StackSDK {
       throw `Missing image for task ${task_name}`;
 
 
-    let name = trim(task_name.replace(/[^a-z0-9_-]/gi, '_').replace(/_+/g, '_'), '_');
-    name = `${name.substring(0, 63 - 6 - 6)}_${md5(task_name).substring(0, 5)}`;
-
+    let name = escape(task_name);
 
     // @todo: implement the rest of the "deploy" spec
     let placement_constraints = get(deploy_specs, "placement.constraints");
@@ -623,3 +625,4 @@ class StackSDK {
 }
 
 module.exports = StackSDK;
+module.exports.escape = escape;
