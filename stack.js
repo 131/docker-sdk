@@ -562,13 +562,13 @@ class StackSDK {
       filters.name = [name];
 
 
-    log.debug(`Checking configs...`);
+    log.debug(`Checking configs...`, filters);
 
     const res  = await this.request('GET', {path : '/configs', qs : {filters : JSON.stringify(filters)}});
-    if(res.statusCode !== 200)
-      throw `Unable to get configs list`;
-
     const body = await drain(res);
+    if(res.statusCode !== 200)
+      throw `Unable to get configs list ${String(body)}`;
+
     return JSON.parse(body);
   }
 
