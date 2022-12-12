@@ -515,6 +515,40 @@ class StackSDK {
     return JSON.parse(body);
   }
 
+  config_read(name) {
+    if(typeof name == 'string')
+      name = {name};
+
+    return this.configs_list(name).then(list => list[0] ? String(Buffer.from(list[0].Spec.Data, 'base64')) : null);
+  }
+
+
+  async config_write(name, value, Labels = {}) {
+    //name with contains {name, namespace}
+    if(typeof name == 'string')
+      name = {name};
+
+    let current = await this.configs_list(name).then(list => list[0]);
+
+    if(current) {
+      let {ID} = current;
+      const res  = await this.request('DELETE', `/configs/${ID}`);
+      if(res.statusCode !== 204)
+        throw `Unable to update ${name} (old version delete failure)`;
+    }
+
+    if(name.namespace)
+      Labels['com.docker.stack.namespace'] = name.namespace;
+
+    let payload = {Name : name.name, Labels, Data : Buffer.from(value).toString('base64')};
+    const res  = await this.request('POST', '/configs/create', payload);
+    const body = await drain(res);
+    if(res.statusCode !== 201)
+      throw `Unable write config ${String(body)}`;
+
+    return JSON.parse(body);
+  }
+
   async configs_list({id, name, namespace} = {}) {
     const filters = {};
 
