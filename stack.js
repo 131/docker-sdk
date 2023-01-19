@@ -418,7 +418,7 @@ class StackSDK {
         if(['complete'].includes(task.Status.State))
           break;
 
-        if(['failed', 'rejected'].includes(task.Status.State))
+        if(['failed', 'rejected', 'shutdown'].includes(task.Status.State))
           throw `Task failed in service ${traceID}: ${task.Status.Err}`;
 
         await sleep(2 * 1000);
