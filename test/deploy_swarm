@@ -21,10 +21,15 @@ volumes:
       type: none
       device: $volume
 
+configs:
+  foo:
+    file: ./test/foo
+
 networks:
   cluster-test:
     driver: overlay
     attachable: true
+
 
 services:
   http-ping:
@@ -40,6 +45,9 @@ services:
 
     networks:
       - cluster-test
+
+
+
 EOS
 
 

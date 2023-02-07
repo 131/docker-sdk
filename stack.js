@@ -209,6 +209,7 @@ class StackSDK {
       logging : logging_specs,
       environment : env_specs,
       secrets : secrets_specs,
+      configs : configs_specs,
       deploy : deploy_specs,
     } = specs;
 
@@ -219,7 +220,7 @@ class StackSDK {
     let name = escape(task_name);
 
     // @todo: implement the rest of the "deploy" spec
-    let placement_constraints = get(deploy_specs, "placement.constraints");
+    let placement_constraints = get(deploy_specs || {}, "placement.constraints");
     if(!Array.isArray(placement_constraints))
       placement_constraints = null;
 
@@ -233,8 +234,10 @@ class StackSDK {
 
     let networks = [];
     if(networks_specs) {
-      for(const network of networks_specs)
-        networks.push({ "Target" : `${this.STACK_NAME}_${network}` });
+      for(const network of networks_specs) {
+        let Target = network == "host" ? "host" : `${this.STACK_NAME}_${network}`;
+        networks.push({Target});
+      }
     }
 
 
@@ -254,6 +257,22 @@ class StackSDK {
         secrets.push({SecretID, SecretName, File : {Name, UID, GID, Mode}});
       }
     }
+
+    let configs = [];
+    if(configs_specs) {
+      let configs_map = await this.configs_list();
+      for(let config of configs_specs) {
+        let {source : ConfigName, mode : Mode, uid : UID, gid : GID, target : Name} = {target : config.source, uid : "0", gid : "0", mode : 0o444, ...config};
+        ConfigName = `${this.STACK_NAME}_${ConfigName}`;
+        let {ID : ConfigID}  = configs_map.find(config => config.Spec.Name == ConfigName) || {};
+
+        if(!ConfigID)
+          throw `Cannot lookup config ${ConfigName}`;
+
+        configs.push({ConfigID, ConfigName, File : {Name, UID, GID, Mode}});
+      }
+    }
+
 
     let mounts = [];
     if(volumes_specs) {
@@ -311,7 +330,7 @@ class StackSDK {
           "Env" : environment,
           "Mounts" : mounts,
           "Secrets" : secrets,
-          // "Configs": [],
+          "Configs" : configs,
         },
 
         "NetworkAttachmentSpec" : {},
