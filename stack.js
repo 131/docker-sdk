@@ -419,6 +419,8 @@ class StackSDK {
 
     log.info("Waiting for service '%s' tasks to stabilize", traceID);
 
+    let delay = 2;
+
     try {
       do {
         const tasks_list = await this.service_tasks(service.ID);
@@ -432,7 +434,7 @@ class StackSDK {
         if(tasks_list.length)
           throw `Pulse service '${traceID}' tasks must be unary (too many tasks remaining in service #${traceID})`;
 
-        log.info(`Task in service ${traceID} is ${task.Status.State} (${task.Status.Message})`);
+        log.info(`Task in service ${traceID} is ${task.Status.State} (${task.Status.Message}) (wait delay is %ds)`, delay);
 
         if(['complete'].includes(task.Status.State))
           break;
@@ -440,7 +442,10 @@ class StackSDK {
         if(['failed', 'rejected', 'shutdown'].includes(task.Status.State))
           throw `Task failed in service ${traceID}: ${task.Status.Err}`;
 
-        await sleep(2 * 1000);
+        if(delay < 60)
+          delay++;
+
+        await sleep(delay * 1000);
       } while(true);
 
     } catch(err) {
