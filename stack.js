@@ -224,6 +224,9 @@ class StackSDK {
     if(!Array.isArray(placement_constraints))
       placement_constraints = null;
 
+    const labels = {
+      "com.docker.stack.namespace" : deploy_ns,
+    };
 
     let environment = [];
     for(const [key, value] of Object.entries(env_specs || {}))
@@ -276,6 +279,8 @@ class StackSDK {
 
     let mounts = [];
     if(volumes_specs) {
+      let volumes_map = await this.volumes_list();
+
       for(const volume of volumes_specs) {
         let mnt = {};
 
@@ -289,27 +294,38 @@ class StackSDK {
         }
 
         else {
+          let VolumeName   = `${this.STACK_NAME}_${volume.source}`;
+          let Volume  = volumes_map.Volumes.find(volume => volume.Name == VolumeName);
+
+          if(!Volume)
+            throw `Cannot lookup volume ${VolumeName}`;
+
+          let DriverConfig = {
+            'Name'    : Volume.Driver,
+            'Options' : Volume.Options
+          };
+
           mnt = {
             'Type'  : volume.type,
-            'Source' : `${this.STACK_NAME}_${volume.source}`,
+            'Source' : VolumeName,
             'Target' : volume.target,
+            'VolumeOptions' : { 'Labels' : labels, DriverConfig },
           };
 
           if('read_only' in volume)
             mnt.ReadOnly = !!volume.read_only;
 
           if('volume' in volume && 'nocopy' in volume.volume)
-            mnt.VolumeOptions = {'NoCopy' : !!volume.volume.nocopy};
+            mnt.VolumeOptions.NoCopy = !!volume.volume.nocopy;
+
+
         }
+
 
         mounts.push(mnt);
       }
     }
 
-
-    const labels = {
-      "com.docker.stack.namespace" : deploy_ns,
-    };
 
     let logging = {};
     if(logging_specs) {
@@ -371,7 +387,7 @@ class StackSDK {
       set(service_payload, "TaskTemplate.ContainerSpec.DNSConfig.Nameservers", dns);
     }
 
-    //console.log(JSON.stringify(service_payload, null, 2));
+    // console.log(JSON.stringify(service_payload, null, 2));
     return service_payload;
 
   }
@@ -571,6 +587,23 @@ class StackSDK {
     const body = await drain(res);
     if(res.statusCode !== 201)
       throw `Unable write config ${String(body)}`;
+
+    return JSON.parse(body);
+  }
+
+  async volumes_list({name, namespace} = {}) {
+    const filters = {};
+
+    if(namespace)
+      filters.label = [`com.docker.stack.namespace=${namespace}`];
+
+    if(name)
+      filters.name = [name];
+
+    const res  = await this.request('GET', {path : '/volumes', qs : {filters : JSON.stringify(filters)}});
+    const body = await drain(res);
+    if(res.statusCode !== 200)
+      throw `Unable to get configs list ${String(body)}`;
 
     return JSON.parse(body);
   }
