@@ -28,9 +28,11 @@ const escape = (input) => {
   return `${name.substring(0, 63 - 6 - 6)}_${md5(input).substring(0, 5)}`;
 };
 
+const DEFAULT_DOCKER_HOST = process.platform == "win32" ? "npipe:////./pipe/docker_engine" : "unix:///var/run/docker.sock";
+
 class StackSDK {
 
-  constructor(stack_name = (process.env['STACK_NAME'] || ''), dockerSock = (process.env["DOCKER_HOST"] || {"socketPath" : "/var/run/docker.sock", "host" : "localhost"})) {
+  constructor(stack_name = (process.env['STACK_NAME'] || ''), dockerSock = (process.env["DOCKER_HOST"] || DEFAULT_DOCKER_HOST)) {
 
     let modem =  new Modem(dockerSock);
     this.request = modem.request;
