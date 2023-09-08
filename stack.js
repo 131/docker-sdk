@@ -587,8 +587,10 @@ class StackSDK {
     let payload = {Name : name.name, Labels, Data : Buffer.from(value).toString('base64')};
     const res  = await this.request('POST', '/configs/create', payload);
     const body = await drain(res);
-    if(res.statusCode !== 201)
-      throw `Unable write config ${String(body)}`;
+    if(res.statusCode !== 201) {
+      console.error(String(body));
+      throw `Unable to write config ${name}`;
+    }
 
     return JSON.parse(body);
   }
