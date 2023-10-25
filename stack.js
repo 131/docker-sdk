@@ -22,10 +22,11 @@ const log = {
   debug : debug("docker-sdk:debug"),
 };
 
+const noop = input => input;
 
-const escape = (input) => {
+const escape = (input, prefix = '') => {
   let name = trim(input.replace(/[^a-z0-9_-]/gi, '_').replace(/_+/g, '_'), '_');
-  return `${name.substring(0, 63 - 6 - 6)}_${md5(input).substring(0, 5)}`;
+  return `${(prefix + name).substring(0, 63 - 6 - 6)}_${md5(input).substring(0, 5)}`;
 };
 
 const DEFAULT_DOCKER_HOST = process.platform == "win32" ? "npipe:////./pipe/docker_engine" : "unix:///var/run/docker.sock";
@@ -559,6 +560,37 @@ class StackSDK {
     return JSON.parse(body);
   }
 
+  async service_inspect(service_name) {
+    const res  = await this.request("GET", {path : `/services/${this.STACK_NAME}_${service_name}`});
+    const body = await drain(res);
+    if(res.statusCode !== 200)
+      throw `Unable to get service for ${service_name}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
+    return JSON.parse(body);
+  }
+
+  async service_labels_read(service_name) {
+    let service = await  this.service_inspect(service_name).catch(() => "");
+    return get(service, 'Spec.Labels') || {};
+  }
+
+  async service_label_write(service_name, label, value) {
+    await this.service_update(service_name, Spec => (Spec.Labels[label] = value, Spec));
+  }
+
+  async service_update(service_name, transform = noop) {
+    let {Spec, Version : { Index : version }} = await this.service_inspect(service_name);
+
+    let payload = await transform(Spec);
+
+    const res  = await this.request("POST", {path : `/services/${this.STACK_NAME}_${service_name}/update`, qs : {version}}, payload);
+    const body = await drain(res);
+    if(res.statusCode !== 200)
+      throw `Unable to update service ${service_name} HTTP ${res.statusCode}, ${body.toString('utf8')}`;
+
+    return JSON.parse(body);
+  }
+
+
   config_read(name) {
     if(typeof name == 'string')
       name = {name};
@@ -612,17 +644,18 @@ class StackSDK {
     return JSON.parse(body);
   }
 
-  async configs_list({id, name, namespace} = {}) {
-    const filters = {};
+  async configs_list({id, name, namespace, label} = {}) {
+    const filters = {label : []};
 
     if(namespace)
-      filters.label = [`com.docker.stack.namespace=${namespace}`];
-
+      filters.label.push(`com.docker.stack.namespace=${namespace}`);
     if(id)
       filters.id = [id];
-
     if(name)
       filters.name = [name];
+    if(label)
+      filters.label.push(label);
+
 
 
     log.debug(`Checking configs...`, filters);
