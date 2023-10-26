@@ -25,6 +25,11 @@ cnyks @131/docker-sdk/registry-sdk my.corp.name.registry.local --ir://run=manife
 
 ```
 
+# Tips
+```
+# Debug using
+socat -v TCP-LISTEN:1234,fork PIPE:/tmp/docker_engine.sock
+```
 
 # Credits 
 * [131](https://github.com/131)

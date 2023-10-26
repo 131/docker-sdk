@@ -12,6 +12,7 @@ const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
+
 const Container = require('./lib/container');
 const Images    = require('./lib/images');
 const Modem     = require('./lib/modem');
@@ -620,7 +621,7 @@ class StackSDK {
     const res  = await this.request('POST', '/configs/create', payload);
     const body = await drain(res);
     if(res.statusCode !== 201) {
-      console.error(String(body));
+      log.error(String(body));
       throw `Unable to write config ${name}`;
     }
 
@@ -715,8 +716,63 @@ class StackSDK {
       throw `Cannot delete service ${service_id}`;
   }
 
+  async monitor({type}, cb) {
+    const idle_timeout = 10 * 1000;
+    var lastEventTime;
+
+    do {
+
+      let filters = {
+        "type" : { [type] : true },
+        "labels" : { 'dspp.task.name' : true },
+      };
+
+      log.info("REquest since", lastEventTime);
+      let res  = await this.request("GET", {path : '/events', qs : {since : lastEventTime, filters : JSON.stringify(filters)}});
+
+      const {push, clear} = setPushTimeout(() => {
+        res.destroy();
+      }, idle_timeout);
+
+      res.on("error", function(err) {
+        log.error("Got error from monitor", err);
+      });
+
+      if(res.statusCode !== 200) {
+        let body = await drain(res);
+        log.error(`Unable to monitor eventsHTTP ${res.statusCode}, ${body.toString('utf8')}`);
+        clear();
+        await sleep(10 * 1000); //wait before retry
+        continue;
+      }
+
+      res.on("data", function(chunk) {
+        try {
+          let body = JSON.parse(chunk);
+          lastEventTime = body.time + 1;
+          cb(body);
+          push();
+        } catch(err) {}
+      });
+
+      await new Promise(resolve => res.once("close", resolve));
+      clear(); //make sure timeout is cleared
+    } while(true);
+
+  }
 
 }
+
+const setPushTimeout = (cb, timeout) => {
+  let t;
+  const clear = () => clearTimeout(t);
+  const end   = () => (clear(), cb());
+  const push = () => {
+    clear();
+    t = setTimeout(cb, timeout);
+  };
+  return push(), {push, clear, end};
+};
 
 module.exports = StackSDK;
 module.exports.escape = escape;
