@@ -717,7 +717,7 @@ class StackSDK {
   }
 
   async monitor({type}, cb) {
-    const idle_timeout = 10 * 1000;
+    const idle_timeout = 60 * 1000;
     var lastEventTime;
 
     do {
