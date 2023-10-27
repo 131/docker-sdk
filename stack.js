@@ -655,9 +655,7 @@ class StackSDK {
     if(name)
       filters.name = [name];
     if(label)
-      filters.label.push(label);
-
-
+      filters.label.push(...(Array.isArray(label) ? label : [label]));
 
     log.debug(`Checking configs...`, filters);
 
