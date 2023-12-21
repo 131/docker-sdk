@@ -530,13 +530,15 @@ class StackSDK {
   }
 
 
-  async service_tasks(service_id) {
+  async service_tasks(service_id, desired_state = null) {
 
     const filters = {
       service : {[service_id] : true},
     };
+    if(desired_state)
+      filters['desired-state'] = {[desired_state] : true};
 
-    log.debug(`Checking task status for service ${service_id}...`);
+    log.debug(`Checking task status for service ${service_id}...`, filters);
     const res  = await this.request("GET", {path : '/tasks', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
 
