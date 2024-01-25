@@ -672,11 +672,12 @@ class StackSDK {
 
   async services_list({namespace, name} = {}) {
     const filters = {};
+    const regExpMode = name instanceof RegExp;
 
     if(namespace)
       filters.label = [`com.docker.stack.namespace=${namespace}`];
 
-    if(name)
+    if(name && !regExpMode)
       filters.name = [name];
 
     log.debug(`Getting services list in ${JSON.stringify(filters)}...`);
@@ -686,7 +687,9 @@ class StackSDK {
     if(res.statusCode !== 200)
       throw `Unable to get services for ${namespace}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
 
-    return JSON.parse(body);
+    let response = JSON.parse(body);
+
+    return response.filter(regExpMode ? ({Spec : {Name}}) => name.test(Name) : () => true);
   }
 
 

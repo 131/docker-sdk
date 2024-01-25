@@ -29,6 +29,8 @@ cnyks @131/docker-sdk/registry-sdk my.corp.name.registry.local --ir://run=manife
 ```
 # Debug using
 socat -v TCP-LISTEN:1234,fork PIPE:/tmp/docker_engine.sock
+socat -v TCP-LISTEN:1234,fork UNIX-CONNECT:/tmp/docker_engine.sock
+export DOCKER_HOST=tcp://127.0.0.1:1234
 ```
 
 # Credits 
