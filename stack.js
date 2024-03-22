@@ -669,6 +669,19 @@ class StackSDK {
     return JSON.parse(body);
   }
 
+  async nodes_list({id} = {}) {
+    const filters = {};
+    if(id)
+      filters.id = [id];
+
+    const res  = await this.request("GET", {path : '/nodes', qs : {filters : JSON.stringify(filters)}});
+    const body = await drain(res);
+    if(res.statusCode !== 200)
+      throw `Unable to get nodes ${res.statusCode}, ${body.toString('utf8')}`;
+
+    let response = JSON.parse(body);
+    return response;
+  }
 
   async services_list({namespace, name} = {}) {
     const filters = {};
