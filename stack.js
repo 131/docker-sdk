@@ -669,10 +669,15 @@ class StackSDK {
     return JSON.parse(body);
   }
 
-  async nodes_list({id} = {}) {
+  async nodes_list({id, name} = {}) {
     const filters = {};
+    const regExpMode = name instanceof RegExp;
+
     if(id)
       filters.id = [id];
+
+    if(name && !regExpMode)
+      filters.name = [name];
 
     const res  = await this.request("GET", {path : '/nodes', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
@@ -680,7 +685,8 @@ class StackSDK {
       throw `Unable to get nodes ${res.statusCode}, ${body.toString('utf8')}`;
 
     let response = JSON.parse(body);
-    return response;
+
+    return response.filter(regExpMode ? ( {Description : {Hostname}}) => name.test(Hostname) : () => true);
   }
 
   async services_list({namespace, name} = {}) {
