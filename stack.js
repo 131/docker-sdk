@@ -529,23 +529,25 @@ class StackSDK {
     return JSON.parse(body);
   }
 
+  async tasks_list({service, state} = {}) {
+    const filters = {};
+    if(service)
+      filters['service'] = {[service] : true};
+    if(state)
+      filters['desired-state'] = {[state] : true};
 
-  async service_tasks(service_id, desired_state = null) {
-
-    const filters = {
-      service : {[service_id] : true},
-    };
-    if(desired_state)
-      filters['desired-state'] = {[desired_state] : true};
-
-    log.debug(`Checking task status for service ${service_id}...`, filters);
+    log.debug(`Checking task status ...`, filters);
     const res  = await this.request("GET", {path : '/tasks', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
 
     if(res.statusCode !== 200)
-      throw `Unable to get tasks for service ${service_id}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
+      throw `Unable to get tasks : HTTP ${res.statusCode}, ${body.toString('utf8')}`;
 
     return JSON.parse(body);
+  }
+
+  async service_tasks(service_id, desired_state = null) {
+    return this.tasks_list({service : service_id, state : desired_state });
   }
 
 
@@ -686,7 +688,7 @@ class StackSDK {
 
     let response = JSON.parse(body);
 
-    return response.filter(regExpMode ? ( {Description : {Hostname}}) => name.test(Hostname) : () => true);
+    return response.filter(regExpMode ? ({Description : {Hostname}}) => name.test(Hostname) : () => true);
   }
 
   async services_list({namespace, name} = {}) {
