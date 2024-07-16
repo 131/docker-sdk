@@ -12,6 +12,7 @@ const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
 const splitArgs = require('nyks/process/splitArgs');
 
+const {pack}      = require('tar-stream');
 
 const Container = require('./lib/container');
 const Images    = require('./lib/images');
@@ -40,6 +41,36 @@ class StackSDK {
     this.request = modem.request;
     this.STACK_NAME = stack_name;
     this.images     = new Images(this);
+
+    //this is used to buffer config archives
+    this.archives_cache = {};
+  }
+
+  async build_config_archive(configs_list) {
+    let hash = [];
+    for(let {ConfigID, File : {Name, UID, GID, Mode}} of configs_list)
+      hash.push(`${ConfigID}/${UID}/${GID}/${Mode}/${Name}`);
+    hash = md5(hash.sort().join());
+
+    if(this.archives_cache[hash])
+      return this.archives_cache[hash];
+
+    log.debug("Build archive hash", hash);
+
+    const archive = pack();
+    let ids = configs_list.map(({ConfigID}) => ConfigID);
+
+    let configs_body = await this.configs_list({id : ids});
+    configs_body = configs_body.reduce((acc, {ID, Spec : {Data}}) => (acc[ID] = Buffer.from(Data, 'base64'), acc), {});
+
+    for(let {ConfigID, File : {Name /*, UID, GID, Mode*/}} of configs_list)
+      archive.entry({ name : Name}, configs_body[ConfigID]);
+
+    archive.finalize();
+    let contents = await drain(archive);
+    this.archives_cache[hash] = contents;
+
+    return contents;
   }
 
   async container_run(specs, registry_auth) {
@@ -58,7 +89,9 @@ class StackSDK {
       working_dir,
       entrypoint,
       volumes : volumes_specs,
+      configs : configs_specs,
       networks : networks_specs,
+      extra_hosts : hosts_specs,
       environment : env_specs,
     } = specs;
 
@@ -66,6 +99,17 @@ class StackSDK {
       throw `Missing image for docker run`;
 
 
+    let extra_hosts = [];
+    if(Array.isArray(hosts_specs)) {
+      for(let line of hosts_specs) {
+        let [name, ip] = line.split("=");
+        extra_hosts.push(`${name.trim()}:${ip.trim()}`);
+      }
+    } else if(typeof hosts_specs == "object") {
+      for(let [name, ip] of Object.entries(hosts_specs))
+        extra_hosts.push(`${name.trim()}:${ip.trim()}`);
+
+    }
 
 
     let environment = [];
@@ -118,6 +162,23 @@ class StackSDK {
         mounts.push(mnt);
       }
     }
+
+    let configs = [];
+    if(configs_specs) {
+      let configs_map = await this.configs_list();
+      for(let config of configs_specs) {
+        let {source : ConfigName, mode : Mode, uid : UID, gid : GID, target : Name} = {target : config.source, uid : "0", gid : "0", mode : 0o444, ...config};
+        ConfigName = `${this.STACK_NAME}_${ConfigName}`;
+        let {ID : ConfigID}  = configs_map.find(config => config.Spec.Name == ConfigName) || {};
+
+        if(!ConfigID)
+          throw `Cannot lookup config ${ConfigName}`;
+
+        configs.push({ConfigID, ConfigName, File : {Name, UID, GID, Mode}});
+      }
+    }
+
+
     /*
     let binds = [];
     if(volumes_specs) {
@@ -167,8 +228,11 @@ class StackSDK {
 
       "Image" : image,
 
+      "Configs" : configs,
+
       "HostConfig" : {
         "Mounts" : mounts,
+        "ExtraHosts" : extra_hosts,
         "AutoRemove" : true,
         "ReadonlyRootfs" : false,
       },
@@ -596,6 +660,7 @@ class StackSDK {
   }
 
 
+
   config_read(name) {
     if(typeof name == 'string')
       name = {name};
@@ -655,7 +720,7 @@ class StackSDK {
     if(namespace)
       filters.label.push(`com.docker.stack.namespace=${namespace}`);
     if(id)
-      filters.id = [id];
+      filters.id = Array.isArray(id) ? id : [id];
     if(name)
       filters.name = [name];
     if(label)

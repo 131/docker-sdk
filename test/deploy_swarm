@@ -6,9 +6,15 @@ volume=$(pwd)/test/volume
 
 if [[ -x /bin/wslpath ]] ; then
   volume=$(wslpath -w $volume)
+  volume=$(printf '%q\n' "$volume")
   echo "Please ignite using"
-  echo "docker volume create  --driver local -o o=bind  -o type=none -o device=$volume validation_webfiles"
+  if ! docker volume inspect validation_webfiles  > /dev/null 2>&1; then
+    echo "docker volume create  --driver local -o o=bind  -o type=none -o device="$volume" validation_webfiles"
+    exit 1
+  fi
+
 fi
+
 
 cat <<EOS | docker stack deploy -c - validation
 version: "3.8"
@@ -25,6 +31,9 @@ configs:
   foo:
     file: ./test/foo
 
+  bar:
+    file: ./test/bar
+
 networks:
   cluster-test:
     driver: overlay
@@ -34,6 +43,12 @@ networks:
 services:
   http-ping:
     image: ghcr.io/131/http-ping:v1.0.0
+
+    configs:
+      - source: foo
+        target: /tmp/foo
+      - source: bar
+        target: /tmp/bar
 
     volumes:
       - type: volume

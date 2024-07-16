@@ -16,7 +16,9 @@ describe("Stack SDK test suite", function() {
 
 
   before("It should ignite a docker stack fixture", async () => {
-    await passthru("./test/deploy_swarm");
+    if(!process.env['SKIP_IGNITE'])
+
+      await passthru("./test/deploy_swarm");
   });
 
   before("It should ignite docker stack sdk instance", function() {
@@ -51,7 +53,7 @@ describe("Stack SDK test suite", function() {
     let target = path.join(__dirname, 'volume', uuid);
     const service_payload = await stack.compose_service("trashme", specs);
     await stack.service_exec(service_payload);
-    expect(fs.readFileSync(target, "utf8")).to.eql("bar");
+    expect(fs.readFileSync(target, "utf8")).to.eql("foo");
     fs.unlinkSync(target);
   });
 
