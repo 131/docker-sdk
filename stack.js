@@ -846,15 +846,21 @@ class StackSDK {
       "labels" : { },
     };
 
-    for(let type of type)
-      filters.type[type] = true;
+    for(let t of type)
+      filters.type[t] = true;
     for(let label of labels)
       filters.labels[label] = true;
 
     do {
 
       log.info("REquest since", lastEventTime);
-      let res  = await this.request_swarm("GET", {path : '/events', qs : {since : lastEventTime, filters : JSON.stringify(filters)}});
+      let query = {
+        path : '/events',
+        qs : {since : lastEventTime, filters : JSON.stringify(filters)},
+        reqtimeout : 120 * 1000
+      };
+
+      let res  = await this.request_swarm("GET", query);
 
       const {push, clear} = setPushTimeout(() => {
         res.destroy();

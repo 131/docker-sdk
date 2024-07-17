@@ -14,13 +14,18 @@
     "cover": "nyc mocha"
   },
   "devDependencies": {
-    "eslint-plugin-ivs": "^2.1.2",
+    "eslint": "^8.57.0",
+    "eslint-plugin-ivs": "^4.0.1",
     "expect.js": "^0.3.1",
     "mocha": "^3.1.2",
     "nyc": "^15.0.1"
   },
   "author": "Francois Leurent <131.code@leurent.email>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:131/docker-sdk.git"
+  },
   "dependencies": {
     "debug": "^4.3.2",
     "mout": "^1.0.0",
