@@ -35,10 +35,17 @@ const DEFAULT_DOCKER_HOST = process.platform == "win32" ? "npipe:////./pipe/dock
 
 class StackSDK {
 
-  constructor(stack_name = (process.env['STACK_NAME'] || ''), dockerSock = (process.env["DOCKER_HOST"] || DEFAULT_DOCKER_HOST)) {
+  constructor(
+    stack_name = (process.env['STACK_NAME'] || ''),
+    dockerSock = (process.env["DOCKER_HOST"] || DEFAULT_DOCKER_HOST),
+    swarmSock = (process.env["SWARM_HOST"] || process.env["DOCKER_HOST"] || DEFAULT_DOCKER_HOST)) {
 
     let modem =  new Modem(dockerSock);
     this.request = modem.request;
+
+    let modem_swarm =  new Modem(swarmSock);
+    this.request_swarm = modem_swarm.request;
+
     this.STACK_NAME = stack_name;
     this.images     = new Images(this);
 
@@ -585,7 +592,7 @@ class StackSDK {
       };
     }
 
-    const res  = await this.request("POST", query, service);
+    const res  = await this.request_swarm("POST", query, service);
     const body = await drain(res);
     if(res.statusCode !== 201)
       throw `Unable to create service ${service.Name}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -601,7 +608,7 @@ class StackSDK {
       filters['desired-state'] = {[state] : true};
 
     log.debug(`Checking task status ...`, filters);
-    const res  = await this.request("GET", {path : '/tasks', qs : {filters : JSON.stringify(filters)}});
+    const res  = await this.request_swarm("GET", {path : '/tasks', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
 
     if(res.statusCode !== 200)
@@ -620,7 +627,7 @@ class StackSDK {
 
     log.debug(`Checking secrets...`);
 
-    const res  = await this.request("GET", '/secrets');
+    const res  = await this.request_swarm("GET", '/secrets');
 
     if(res.statusCode !== 200)
       throw `Unable to get secrets`;
@@ -630,7 +637,7 @@ class StackSDK {
   }
 
   async service_inspect(service_name) {
-    const res  = await this.request("GET", {path : `/services/${this.STACK_NAME}_${service_name}`});
+    const res  = await this.request_swarm("GET", {path : `/services/${this.STACK_NAME}_${service_name}`});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get service for ${service_name}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -651,7 +658,7 @@ class StackSDK {
 
     let payload = await transform(Spec);
 
-    const res  = await this.request("POST", {path : `/services/${this.STACK_NAME}_${service_name}/update`, qs : {version}}, payload);
+    const res  = await this.request_swarm("POST", {path : `/services/${this.STACK_NAME}_${service_name}/update`, qs : {version}}, payload);
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to update service ${service_name} HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -678,7 +685,7 @@ class StackSDK {
 
     if(current) {
       let {ID} = current;
-      const res  = await this.request('DELETE', `/configs/${ID}`);
+      const res  = await this.request_swarm('DELETE', `/configs/${ID}`);
       if(res.statusCode !== 204)
         throw `Unable to update ${name} (old version delete failure)`;
     }
@@ -687,7 +694,7 @@ class StackSDK {
       Labels['com.docker.stack.namespace'] = name.namespace;
 
     let payload = {Name : name.name, Labels, Data : Buffer.from(value).toString('base64')};
-    const res  = await this.request('POST', '/configs/create', payload);
+    const res  = await this.request_swarm('POST', '/configs/create', payload);
     const body = await drain(res);
     if(res.statusCode !== 201) {
       log.error(String(body));
@@ -728,7 +735,7 @@ class StackSDK {
 
     log.debug(`Checking configs...`, filters);
 
-    const res  = await this.request('GET', {path : '/configs', qs : {filters : JSON.stringify(filters)}});
+    const res  = await this.request_swarm('GET', {path : '/configs', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get configs list ${String(body)}`;
@@ -746,7 +753,7 @@ class StackSDK {
     if(name && !regExpMode)
       filters.name = [name];
 
-    const res  = await this.request("GET", {path : '/nodes', qs : {filters : JSON.stringify(filters)}});
+    const res  = await this.request_swarm("GET", {path : '/nodes', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get nodes ${res.statusCode}, ${body.toString('utf8')}`;
@@ -768,7 +775,7 @@ class StackSDK {
 
     log.debug(`Getting services list in ${JSON.stringify(filters)}...`);
 
-    const res  = await this.request("GET", {path : '/services', qs : {filters : JSON.stringify(filters)}});
+    const res  = await this.request_swarm("GET", {path : '/services', qs : {filters : JSON.stringify(filters)}});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get services for ${namespace}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -788,7 +795,7 @@ class StackSDK {
 
     log.debug(`Fetching ${stdout && stderr ? 'all' : stdout ? 'stdout' : 'stderr'} logs for service ${service_id}...`);
 
-    const res  = await this.request("GET", {path : `/services/${service_id}/logs`, qs : params});
+    const res  = await this.request_swarm("GET", {path : `/services/${service_id}/logs`, qs : params});
     const body = await drain(res);
     if(res.statusCode !== 200)
       throw `Unable to get logs for service ${service_id}: HTTP ${res.statusCode}, ${body.toString('utf8')}`;
@@ -799,7 +806,7 @@ class StackSDK {
 
   async service_delete(service_id) {
     log.debug(`Removing service ${service_id}...`);
-    const res = await this.request('DELETE', `/services/${service_id}`);
+    const res = await this.request_swarm('DELETE', `/services/${service_id}`);
 
     if(![200, 404].includes(res.statusCode))
       throw `Cannot delete service ${service_id}`;
