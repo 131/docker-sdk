@@ -6,7 +6,7 @@ const get       = require('mout/object/get');
 const set       = require('mout/object/set');
 const trim      = require('mout/string/trim');
 
-
+const cache     = require('nyks/function/cache');
 const sleep     = require('nyks/async/sleep');
 const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
@@ -33,6 +33,9 @@ const escape = (input, prefix = '') => {
 
 const DEFAULT_DOCKER_HOST = process.platform == "win32" ? "npipe:////./pipe/docker_engine" : "unix:///var/run/docker.sock";
 
+
+
+
 class StackSDK {
 
   constructor(
@@ -52,6 +55,23 @@ class StackSDK {
     //this is used to buffer config archives
     this.archives_cache = {};
   }
+
+  start_cache_monitor() {
+
+    this.configs_list = cache(this.configs_list);
+    this.volumes_list = cache(this.volumes_list);
+    this.secrets_list = cache(this.secrets_list);
+
+    this.monitor({ type : ['config', 'volume', 'secret']}, (event) => {
+      if(event.Type == "config")
+        this.configs_list.clear();
+      if(event.Type == "volume")
+        this.volumes_list.clear();
+      if(event.Type == "secret")
+        this.secrets_list.clear();
+    });
+  }
+
 
   async build_config_archive(configs_list) {
     let hash = [];
@@ -812,19 +832,29 @@ class StackSDK {
       throw `Cannot delete service ${service_id}`;
   }
 
-  async monitor({type}, cb) {
+  async monitor({type = [], labels = []}, cb) {
     const idle_timeout = 60 * 1000;
     var lastEventTime;
 
+    if(!Array.isArray(type))
+      type = [type];
+    if(!Array.isArray(labels))
+      labels = [labels];
+
+    let filters = {
+      "type" : { },
+      "labels" : { },
+    };
+
+    for(let type of type)
+      filters.type[type] = true;
+    for(let label of labels)
+      filters.labels[label] = true;
+
     do {
 
-      let filters = {
-        "type" : { [type] : true },
-        "labels" : { 'dspp.task.name' : true },
-      };
-
       log.info("REquest since", lastEventTime);
-      let res  = await this.request("GET", {path : '/events', qs : {since : lastEventTime, filters : JSON.stringify(filters)}});
+      let res  = await this.request_swarm("GET", {path : '/events', qs : {since : lastEventTime, filters : JSON.stringify(filters)}});
 
       const {push, clear} = setPushTimeout(() => {
         res.destroy();
