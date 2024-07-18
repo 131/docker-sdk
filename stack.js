@@ -6,7 +6,7 @@ const get       = require('mout/object/get');
 const set       = require('mout/object/set');
 const trim      = require('mout/string/trim');
 
-const cache     = require('nyks/function/cache');
+const cache     = require('nyks/function/cache/noParams');
 const sleep     = require('nyks/async/sleep');
 const drain     = require('nyks/stream/drain');
 const md5       = require('nyks/crypto/md5');
