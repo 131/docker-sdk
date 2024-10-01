@@ -28,14 +28,13 @@ class RegistrySDK {
   constructor(name, credentials = null, secured = undefined) {
     let env = trim(name.toUpperCase().replace(/[^a-z]+/gi,  '_'), '_');
     let user = `${env}_USER`, password = `${env}_PASSWORD`;
-
     if(user in process.env)
       credentials =  {username  : process.env[user], password : process.env[password]};
 
     this.name        = name;
     this.credentials = credentials;
     this.secured     = secured === undefined ? true : !!secured;
-    this.tokens      = {};
+    this.token       = null;
   }
 
   async all_manifests(path) {
@@ -79,8 +78,8 @@ class RegistrySDK {
     };
 
 
-    if(this.tokens.default)
-      query.headers.Authorization = `Bearer ${this.tokens.default}`;
+    if(this.token)
+      query.headers.Authorization = this.token.Authorization;
 
     log.debug("Query", url.format(query), {path});
 
@@ -92,49 +91,66 @@ class RegistrySDK {
       return JSON.parse(body);
     }
 
-    delete this.tokens.default;
+    delete this.token;
 
     if(manifest_res1.statusCode !== 401)
       throw `Unsupported authenticate: HTTP ${manifest_res1.statusCode} for ${query.href}`;
 
-    if(!('www-authenticate' in manifest_res1.headers))
+    let header = manifest_res1.headers['www-authenticate'];
+    if(!header)
       throw `Unable to find auth URL for ${query.href}`;
 
-    const www_auth = headerParse(stripStart(manifest_res1.headers['www-authenticate'], 'Bearer ').trim());
+    if(header.startsWith('Basic ')) {
+      let Authorization = 'Basic ' + Buffer.from(`${this.credentials.username}:${this.credentials.password}`).toString('base64');
+      query.headers.Authorization = Authorization;
+      const manifest_res2 = await request(query);
+      if(manifest_res2.statusCode !== 200)
+        throw `Manifest not found on ${this.name} for ${path}`;
 
-    const auth_query = {
-      ...url.parse(www_auth.realm),
-      qs : {service : www_auth.service, scope : www_auth.scope},
-      json : true,
-      headers : {},
-    };
+      this.token = {Authorization}; //this might be smarter
 
-    if(this.credentials)
-      auth_query.headers.Authorization = 'Basic ' + Buffer.from(`${this.credentials.username}:${this.credentials.password}`).toString('base64');
-
-
-    log.info("Authenticating over", this.name);
-    log.debug("auth_query", auth_query);
-    const auth_res  = await request(auth_query);
-    const auth_body = await drain(auth_res);
-    if(auth_res.statusCode !== 200) {
-      if(!this.crendentials)
-        throw `Credentials (username/password) not found for registry '${this.name}'`;
-      throw `Unable to authenticate`;
+      return JSON.parse(await drain(manifest_res2));
     }
 
-    const {token} = JSON.parse(auth_body);
+    if(header.startsWith('Bearer ')) {
+
+      const www_auth = headerParse(stripStart(header, 'Bearer ').trim());
+
+      const auth_query = {
+        ...url.parse(www_auth.realm),
+        qs : {service : www_auth.service, scope : www_auth.scope},
+        json : true,
+        headers : {},
+      };
+
+      if(this.credentials)
+        auth_query.headers.Authorization = 'Basic ' + Buffer.from(`${this.credentials.username}:${this.credentials.password}`).toString('base64');
 
 
-    query.headers.Authorization = `Bearer ${token}`;
+      log.info("Authenticating over", this.name);
+      log.debug("auth_query", auth_query);
+      const auth_res  = await request(auth_query);
+      const auth_body = await drain(auth_res);
+      if(auth_res.statusCode !== 200) {
+        if(!this.crendentials)
+          throw `Credentials (username/password) not found for registry '${this.name}'`;
+        throw `Unable to authenticate`;
+      }
 
-    const manifest_res2 = await request(query);
-    if(manifest_res2.statusCode !== 200)
-      throw `Manifest not found on ${this.name} for ${path}`;
+      const {token} = JSON.parse(auth_body);
+      let Authorization = `Bearer ${token}`;
+      query.headers.Authorization = Authorization;
 
-    this.tokens.default = token; //this might be smarter
+      const manifest_res2 = await request(query);
+      if(manifest_res2.statusCode !== 200)
+        throw `Manifest not found on ${this.name} for ${path}`;
 
-    return JSON.parse(await drain(manifest_res2));
+      this.token = {token, Authorization}; //this might be smarter
+
+      return JSON.parse(await drain(manifest_res2));
+    }
+
+
   }
 
 
