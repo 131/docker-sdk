@@ -19,6 +19,7 @@ const log = {
   debug : debug("docker-sdk:debug"),
 };
 
+const DOCKER_REGISTRY  = process.env.DOCKER_REGISTRY || 'docker.io';
 
 const TYPE_MANIFEST      = "application/vnd.docker.distribution.manifest.v2+json";
 const TYPE_MANIFEST_LIST = "application/vnd.docker.distribution.manifest.list.v2+json";
@@ -165,7 +166,7 @@ class RegistrySDK {
 
     let hostname;
     let tmp = split2(image_name, '/');
-    [hostname, image_name] = tmp[0].includes('.') || tmp[0].includes(':') ? tmp : ['docker.io', image_name];
+    [hostname, image_name] = tmp[0].includes('.') || tmp[0].includes(':') ? tmp : [DOCKER_REGISTRY, image_name];
 
     let digest, tag;
 
