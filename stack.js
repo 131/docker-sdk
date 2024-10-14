@@ -290,7 +290,7 @@ class StackSDK {
     return JSON.parse(await drain(res));
   }
 
-  async compose_service(task_name, specs, stack, deploy_ns = this.STACK_NAME) {
+  async compose_service(task_name, specs, stack = {}, deploy_ns = this.STACK_NAME) {
 
     let {
       command,
@@ -385,6 +385,8 @@ class StackSDK {
           };
           volumes_map.push(volume);
         }
+      } else {
+        volumes_map = (await this.volumes_list()).Volumes;
       }
 
       for(const volume of volumes_specs) {
