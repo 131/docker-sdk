@@ -290,7 +290,7 @@ class StackSDK {
     return JSON.parse(await drain(res));
   }
 
-  async compose_service(task_name, specs, deploy_ns = this.STACK_NAME) {
+  async compose_service(task_name, specs, stack, deploy_ns = this.STACK_NAME) {
 
     let {
       command,
@@ -374,7 +374,18 @@ class StackSDK {
 
     let mounts = [];
     if(volumes_specs) {
-      let volumes_map = await this.volumes_list();
+      let volumes_map = [];
+
+      if(stack.volumes) {
+        for(let [volume_name, volume_spec] of Object.entries(stack.volumes)) {
+          let volume = {
+            "Driver"  : volume_spec.driver,
+            "Options" : volume_spec.driver_opts,
+            "Name"    : `${this.STACK_NAME}_${volume_name}`,
+          };
+          volumes_map.push(volume);
+        }
+      }
 
       for(const volume of volumes_specs) {
         let mnt = {};
@@ -390,7 +401,7 @@ class StackSDK {
 
         else {
           let VolumeName   = `${this.STACK_NAME}_${volume.source}`;
-          let Volume  = volumes_map.Volumes.find(volume => volume.Name == VolumeName);
+          let Volume  = volumes_map.find(volume => volume.Name == VolumeName);
 
           if(!Volume)
             throw `Cannot lookup volume ${VolumeName}`;
