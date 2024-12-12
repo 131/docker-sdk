@@ -391,12 +391,8 @@ class StackSDK {
         let mnt = {};
 
         if(typeof volume === 'string') {
-          const [source, target] = volume.split(':');
-          mnt = {
-            'Type'  : 'bind',
-            'Source' : `${this.STACK_NAME}_${source}`,
-            'Target' : target,
-          };
+          const [Source, Target] = volume.split(':');
+          mnt = { 'Type'  : 'bind', Source, Target };
         }
 
         else {
