@@ -164,20 +164,17 @@ class StackSDK {
         let mnt = {};
 
         if(typeof volume === 'string') {
-          const [source, target] = volume.split(':');
-          mnt = {
-            'Type'  : 'bind',
-            'Source' : `${this.STACK_NAME}_${source}`,
-            'Target' : target,
-          };
+          const [Source, Target] = volume.split(':');
+          mnt = { 'Type'  : 'bind', Source, Target };
         }
 
         else {
-          mnt = {
-            'Type'  : volume.type,
-            'Source' : `${this.STACK_NAME}_${volume.source}`,
-            'Target' : volume.target,
-          };
+          let {source : Source, target : Target, type : Type} = volume;
+
+          if(Type != "bind")
+            Source = `${this.STACK_NAME}_${Source}`;
+
+          mnt = {Type, Source, Target};
 
           if('read_only' in volume)
             mnt.ReadOnly = !!volume.read_only;
