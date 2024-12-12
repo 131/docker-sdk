@@ -294,6 +294,7 @@ class StackSDK {
 
     let {
       command,
+      user,
       image,
       working_dir,
       entrypoint,
@@ -453,6 +454,7 @@ class StackSDK {
           "Labels" : labels,
           "Env" : environment,
           "Mounts" : mounts,
+          "User" : user,
           "Secrets" : secrets,
           "Configs" : configs,
         },
