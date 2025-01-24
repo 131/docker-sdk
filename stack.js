@@ -714,6 +714,7 @@ class StackSDK {
     if(current) {
       let {ID} = current;
       const res  = await this.request_swarm('DELETE', `/configs/${ID}`);
+      await drain(res);
       if(res.statusCode !== 204)
         throw `Unable to update ${name} (old version delete failure)`;
     }
