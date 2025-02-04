@@ -387,15 +387,21 @@ class StackSDK {
         volumes_map = (await this.volumes_list()).Volumes;
       }
 
-      for(const volume of volumes_specs) {
+      for(let volume of volumes_specs) {
         let mnt = {};
 
         if(typeof volume === 'string') {
-          const [Source, Target] = volume.split(':');
-          mnt = { 'Type'  : 'bind', Source, Target };
+          const [source, target] = volume.split(':');
+          volume = { 'type'  : 'bind', source, target };
         }
 
-        else {
+        if(volume.type == "bind") {
+          mnt = {
+            'Type'  : volume.type,
+            'Source' : volume.source,
+            'Target' : volume.target
+          };
+        } else {
           let VolumeName   = `${this.STACK_NAME}_${volume.source}`;
           let Volume  = volumes_map.find(volume => volume.Name == VolumeName);
 
@@ -419,10 +425,7 @@ class StackSDK {
 
           if('volume' in volume && 'nocopy' in volume.volume)
             mnt.VolumeOptions.NoCopy = !!volume.volume.nocopy;
-
-
         }
-
 
         mounts.push(mnt);
       }
