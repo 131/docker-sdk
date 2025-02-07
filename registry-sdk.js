@@ -172,7 +172,7 @@ class RegistrySDK {
 
     [image_name, digest] = image_name.includes('@') ? split2(image_name, '@') : [image_name];
     [image_name, tag] = image_name.includes(':') ? split2(image_name, ':') : [image_name, 'latest'];
-    const hash = `${hostname}${image_name}:${tag}@${digest}`;
+    const hash = `${hostname}/${image_name}:${tag}@${digest || ""}`;
     return {registry : hostname, path : image_name, tag, digest, hash};
   }
 

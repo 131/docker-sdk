@@ -13,6 +13,7 @@ describe("Registry test suite", function() {
       "path"     : "library/debian",
       "tag"      : "latest",
       "digest"   : undefined,
+      "hash"     : "docker.io/library/debian:latest@"
     });
 
     expect(canonizeImagePath("rclone/rclone@sha256:f186eb535186c0da798385e1710e09c9bcfadc2a1efa176959d9462d96d9b8b8")).to.eql({
@@ -20,6 +21,7 @@ describe("Registry test suite", function() {
       "path"     : "rclone/rclone",
       "tag"      : "latest",
       "digest"   : "sha256:f186eb535186c0da798385e1710e09c9bcfadc2a1efa176959d9462d96d9b8b8",
+      "hash" : "docker.io/rclone/rclone:latest@sha256:f186eb535186c0da798385e1710e09c9bcfadc2a1efa176959d9462d96d9b8b8"
     });
 
 
@@ -28,6 +30,7 @@ describe("Registry test suite", function() {
       "path"     : "library/node",
       "tag"      : "12",
       "digest"   : undefined,
+      "hash" : "docker.io/library/node:12@"
     });
 
     expect(canonizeImagePath("registry.docker.internal.net/some/project/path:v1.2.0-clyks")).to.eql({
@@ -35,6 +38,7 @@ describe("Registry test suite", function() {
       "path"     : "some/project/path",
       "tag"      : "v1.2.0-clyks",
       "digest"   : undefined,
+      "hash"     : "registry.docker.internal.net/some/project/path:v1.2.0-clyks@"
     });
 
     expect(canonizeImagePath("registry-docker-internal-net:5000/some/project/path:v1.2.0-clyks")).to.eql({
@@ -42,6 +46,7 @@ describe("Registry test suite", function() {
       "path"     : "some/project/path",
       "tag"      : "v1.2.0-clyks",
       "digest"   : undefined,
+      "hash" : "registry-docker-internal-net:5000/some/project/path:v1.2.0-clyks@"
     });
 
 
