@@ -336,7 +336,6 @@ class StackSDK {
       }
     }
 
-
     let secrets = [];
     if(secrets_specs) {
       let secrets_map = await this.secrets_list();
@@ -445,6 +444,7 @@ class StackSDK {
       "Labels" : labels,
 
       "TaskTemplate" : {
+        "Networks": networks,
         "ContainerSpec" : {
           "Image" : image,
           "Labels" : labels,
@@ -469,7 +469,6 @@ class StackSDK {
         "Replicated" : {"Replicas" : 1},
       },
 
-      "Networks" : networks,
     };
 
     if(entrypoint)
